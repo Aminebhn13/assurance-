@@ -1,61 +1,69 @@
-import Link from "next/link";
+"use client";
+
+import { ShieldCheck, Twitter, Github, Linkedin, Mail } from "lucide-react";
+
+const cols = [
+  {
+    title: "Produit",
+    links: ["Affacturage", "Assurance", "Tarifs", "Simulateur", "FAQ"],
+  },
+  {
+    title: "Entreprise",
+    links: ["À propos", "Équipe", "Carrières", "Presse", "Contact"],
+  },
+  {
+    title: "Légal",
+    links: ["Mentions légales", "Confidentialité", "CGU", "Conformité", "Audits"],
+  },
+];
 
 export default function Footer() {
-  const cols = [
-    {
-      title: "Comprendre",
-      links: [
-        { href: "/assurance-de-pret", label: "Assurance de prêt" },
-        { href: "/affacturage", label: "Affacturage" },
-        { href: "/solvabilite", label: "Solvabilité" },
-        { href: "/securite-wallet", label: "Sécurité wallet" },
-        { href: "/glossaire", label: "Glossaire" },
-        { href: "/faq", label: "FAQ" },
-      ],
-    },
-    {
-      title: "Assureur",
-      links: [
-        { href: "/comment-ca-marche", label: "Comment ça marche" },
-        { href: "/tarifs", label: "Tarifs" },
-        { href: "/fonds-partenaires", label: "Fonds partenaires" },
-        { href: "/souscrire", label: "Souscrire" },
-      ],
-    },
-    {
-      title: "Légal",
-      links: [
-        { href: "/mentions-legales", label: "Mentions légales" },
-        { href: "/cgu", label: "CGU" },
-        { href: "/confidentialite", label: "Confidentialité" },
-      ],
-    },
-  ];
-
   return (
-    <footer className="border-t border-navy-border bg-navy-dark">
-      <div className="mx-auto max-w-6xl px-4 py-12 grid gap-8 sm:grid-cols-2 md:grid-cols-4">
-        <div>
-          <div className="text-xl font-bold gold-text mb-3">AssureCrypto</div>
-          <p className="text-sm text-gray-400">
-            L&apos;assurance qui rassure votre prêteur. AssureCrypto ne prête pas d&apos;argent et ne finance rien.
+    <footer className="relative z-10 border-t border-dark-700 bg-dark-950/80">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
+          <div className="col-span-2">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-accent-blue to-accent-purple">
+                <ShieldCheck size={22} className="text-white" />
+              </div>
+              <span className="text-xl font-bold tracking-tight">
+                Assure<span className="text-accent-blue">Crypto</span>
+              </span>
+            </div>
+            <p className="text-sm text-gray-400 max-w-xs leading-relaxed">
+              L'assurance et l'affacturage décentralisés pour sécuriser tes prêts crypto. Transparent, rapide, fiable.
+            </p>
+            <div className="flex gap-3 mt-6">
+              {[Twitter, Github, Linkedin, Mail].map((Icon, i) => (
+                <a key={i} href="#" className="p-2.5 rounded-xl bg-dark-700 text-gray-400 hover:text-white hover:bg-dark-600 transition-all">
+                  <Icon size={18} />
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {cols.map((col, i) => (
+            <div key={i}>
+              <h4 className="text-white font-semibold mb-4">{col.title}</h4>
+              <ul className="space-y-2.5">
+                {col.links.map((link, j) => (
+                  <li key={j}>
+                    <a href="#" className="text-sm text-gray-400 hover:text-white transition-colors">{link}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <div className="border-t border-dark-700 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-xs text-gray-500">© {new Date().getFullYear()} AssureCrypto. Tous droits réservés.</p>
+          <p className="text-xs text-gray-500 flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-accent-green animate-pulse" />
+            Tous les systèmes sont opérationnels
           </p>
         </div>
-        {cols.map((c) => (
-          <div key={c.title}>
-            <div className="font-semibold text-gold-light mb-3">{c.title}</div>
-            <ul className="space-y-2 text-sm">
-              {c.links.map((l) => (
-                <li key={l.href}>
-                  <Link href={l.href} className="text-gray-400 hover:text-white transition">{l.label}</Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-      <div className="border-t border-navy-border py-4 text-center text-xs text-gray-500">
-        © {new Date().getFullYear()} AssureCrypto. [À COMPLÉTER : n° d&apos;agrément ACPR / ORIAS]
       </div>
     </footer>
   );
