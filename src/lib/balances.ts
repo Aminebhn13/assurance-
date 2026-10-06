@@ -30,9 +30,30 @@ export interface BalanceSnapshot {
   readAt: string;
 }
 
-function getProvider(): ethers.JsonRpcProvider {
-  const rpc = process.env.NEXT_PUBLIC_RPC_URL || "https://eth.llamarpc.com";
-  return new ethers.JsonRpcProvider(rpc);
+// Plusieurs endpoints RPC publics : on essaie le suivant si l'un échoue
+// (rate-limit, CORS, indisponibilité). Lecture seule uniquement.
+const RPC_ENDPOINTS: string[] = [
+  process.env.NEXT_PUBLIC_RPC_URL || "https://eth.llamarpc.com",
+  "https://ethereum-rpc.publicnode.com",
+  "https://rpc.ankr.com/eth",
+  "https://cloudflare-eth.com",
+].filter((v, i, a) => !!v && a.indexOf(v) === i);
+
+async function getWorkingProvider(): Promise<ethers.JsonRpcProvider> {
+  let lastErr: unknown = null;
+  for (const url of RPC_ENDPOINTS) {
+    try {
+      const provider = new ethers.JsonRpcProvider(url);
+      // Vérifie que l'endpoint répond avant de l'utiliser.
+      await provider.getBlockNumber();
+      return provider;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw new Error(
+    "Impossible de contacter un noeud Ethereum pour lire les soldes. Réessayez dans un instant."
+  );
 }
 
 async function readErc20(provider: ethers.JsonRpcProvider, token: string, owner: string): Promise<AssetBalance | null> {
@@ -56,8 +77,13 @@ async function readErc20(provider: ethers.JsonRpcProvider, token: string, owner:
 }
 
 export async function getBalances(address: string): Promise<BalanceSnapshot> {
-  const provider = getProvider();
-  const eth = await provider.getBalance(address);
+  const provider = await getWorkingProvider();
+  let eth = "0";
+  try {
+    eth = ethers.formatEther(await provider.getBalance(address));
+  } catch {
+    eth = "0";
+  }
   const [usdc, usdt] = await Promise.all([
     readErc20(provider, USDC_ADDRESS, address),
     readErc20(provider, USDT_ADDRESS, address),
@@ -66,7 +92,7 @@ export async function getBalances(address: string): Promise<BalanceSnapshot> {
     address,
     chainId: 1,
     network: "Ethereum Mainnet",
-    eth: ethers.formatEther(eth),
+    eth,
     usdc,
     usdt,
     readAt: new Date().toISOString(),
