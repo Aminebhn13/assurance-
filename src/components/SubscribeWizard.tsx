@@ -97,10 +97,9 @@ export default function SubscribeWizard() {
   const plan = COVERAGE_PLANS.find((p) => p.id === planId)!;
   const premium = solvency ? computePremium(loanAmount, duration, plan) : 0;
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!wallet?.address || !signature || !balances) return;
     const ref = generateReference();
-    setReference(ref);
     const data: AttestationData = {
       reference: ref,
       address: wallet.address,
@@ -118,7 +117,13 @@ export default function SubscribeWizard() {
       score: solvency?.score,
       coverageRatio: solvency?.coverageRatio,
     };
-    downloadAttestation(data);
+    setError(null); setLoading(true);
+    try {
+      await downloadAttestation(data);
+      setReference(ref);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur lors de la génération du PDF");
+    } finally { setLoading(false); }
   };
 
   return (
@@ -286,9 +291,9 @@ export default function SubscribeWizard() {
             <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} className="mt-1 accent-gold" />
             <span>J&apos;ai lu et j&apos;accepte les <a href="/cgu" className="text-gold-light underline">CGU</a> et la <a href="/confidentialite" className="text-gold-light underline">politique de confidentialité</a>.</span>
           </label>
-          <button onClick={handleGenerate} disabled={!accepted}
+          <button onClick={handleGenerate} disabled={!accepted || loading}
             className="btn-gold px-6 py-3 rounded-xl font-semibold disabled:opacity-40">
-            Générer l&apos;attestation (téléchargement)
+            {loading ? "Génération du PDF…" : "Télécharger l'attestation (PDF)"}
           </button>
           {reference && (
             <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-4 text-sm">

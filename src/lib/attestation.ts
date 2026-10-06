@@ -26,16 +26,7 @@ function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-export function buildAttestationHtml(d: AttestationData): string {
-  const issued = new Date();
-  const issuedStr = issued.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
-  const readStr = new Date(d.readAt).toLocaleString("fr-FR");
-  const money = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 0 }) + " USD";
-
-  return `<!DOCTYPE html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Attestation ${esc(d.reference)} — AssureCrypto</title>
-<style>
+const STYLES = `
   :root{
     --navy:#0b1f3a; --navy2:#13294d; --gold:#c9a24b; --gold2:#e4c877;
     --ink:#1a2233; --muted:#6b7686; --line:#e5e8ee; --bg:#eef1f6;
@@ -90,18 +81,22 @@ export function buildAttestationHtml(d: AttestationData): string {
     display:flex;align-items:center;justify-content:center;color:#8a6d1f;font-size:10px;font-weight:700;
     text-transform:uppercase;letter-spacing:1px;text-align:center;padding:8px;transform:rotate(-8deg)}
   @media (max-width:640px){.inner{padding:28px 22px}.grid{grid-template-columns:1fr}.watermark{font-size:72px}}
+  .for-pdf .page{box-shadow:none;margin:0;max-width:none;border-radius:0}
   @media print{
     body{background:#fff}
     .toolbar{display:none}
     .page{box-shadow:none;margin:0;max-width:none;border-radius:0}
     @page{margin:14mm}
   }
-</style></head>
-<body>
-  <div class="toolbar">
-    <button class="btn btn-print" onclick="window.print()">Imprimer / Enregistrer en PDF</button>
-  </div>
-  <div class="page">
+`;
+
+function pageMarkup(d: AttestationData): string {
+  const issued = new Date();
+  const issuedStr = issued.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+  const readStr = new Date(d.readAt).toLocaleString("fr-FR");
+  const money = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 0 }) + " USD";
+
+  return `  <div class="page">
     <div class="watermark">INDICATIF</div>
     <div class="inner">
       <header>
@@ -184,17 +179,47 @@ export function buildAttestationHtml(d: AttestationData): string {
         </div>
       </footer>
     </div>
+  </div>`;
+}
+
+export function buildAttestationHtml(d: AttestationData): string {
+  return `<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Attestation ${esc(d.reference)} — AssureCrypto</title>
+<style>${STYLES}</style></head>
+<body>
+  <div class="toolbar">
+    <button class="btn btn-print" onclick="window.print()">Imprimer / Enregistrer en PDF</button>
   </div>
+${pageMarkup(d)}
 </body></html>`;
 }
 
-export function downloadAttestation(d: AttestationData): void {
-  const html = buildAttestationHtml(d);
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `attestation-${d.reference}.html`;
-  a.click();
-  URL.revokeObjectURL(url);
+// Génère un vrai fichier PDF A4 côté client, à partir du même design.
+export async function downloadAttestation(d: AttestationData): Promise<void> {
+  const mod = await import("html2pdf.js");
+  const html2pdf = (mod as unknown as { default: (...a: unknown[]) => any }).default;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "for-pdf";
+  wrapper.style.cssText = "position:fixed;left:-10000px;top:0;width:820px;background:#fff;z-index:-1";
+  wrapper.innerHTML = `<style>${STYLES}</style>${pageMarkup(d)}`;
+  document.body.appendChild(wrapper);
+
+  const target = wrapper.querySelector(".page") as HTMLElement;
+  try {
+    await html2pdf()
+      .set({
+        margin: 0,
+        filename: `attestation-${d.reference}.pdf`,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        pagebreak: { mode: ["css", "avoid-all"] },
+      })
+      .from(target)
+      .save();
+  } finally {
+    document.body.removeChild(wrapper);
+  }
 }
