@@ -1,85 +1,85 @@
 "use client";
 
-// Gestion de la connexion wallet (MetaMask + WalletConnect)
+// Connexion wallet : MetaMask (EIP-1193) et WalletConnect (Reown).
+// AUCUNE transaction, AUCUN approve, AUCUNE autorisation. Lecture seule + signature SIWE.
 
-type WalletState = {
+export const TARGET_CHAIN_ID = "0x1"; // Ethereum Mainnet
+
+export interface WalletState {
   address: string | null;
+  shortAddress: string | null;
   connected: boolean;
-  provider: any;
+  chainId: number | null;
   method: "metamask" | "walletconnect" | null;
-};
+}
 
-// Réseau cible : Ethereum Mainnet
-export const TARGET_CHAIN_ID = "0x1";
+// Provider du wallet actuellement connecté (MetaMask ou WalletConnect),
+// utilisé pour la signature SIWE.
+type Eip1193Provider = { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> };
+let activeProvider: Eip1193Provider | null = null;
+
+export function getActiveProvider(): Eip1193Provider | null {
+  return activeProvider;
+}
+
+export function isMetaMaskInstalled(): boolean {
+  return typeof window !== "undefined" && !!window.ethereum;
+}
+
+async function requestAccounts(provider: Window["ethereum"]): Promise<string[]> {
+  const accounts = (await provider?.request({ method: "eth_requestAccounts" })) as string[];
+  return accounts ?? [];
+}
+
+async function ensureMainnet(provider: Window["ethereum"]): Promise<void> {
+  const chainId = (await provider?.request({ method: "eth_chainId" })) as string;
+  if (chainId !== TARGET_CHAIN_ID) {
+    try {
+      await provider?.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: TARGET_CHAIN_ID }],
+      });
+    } catch (err: unknown) {
+      const e = err as { code?: number };
+      if (e.code === 4902) {
+        await provider?.request({
+          method: "wallet_addEthereumChain",
+          params: [{
+            chainId: TARGET_CHAIN_ID,
+            chainName: "Ethereum Mainnet",
+            nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+            rpcUrls: ["https://eth.llamarpc.com"],
+            blockExplorerUrls: ["https://etherscan.io"],
+          }],
+        });
+      } else {
+        throw err;
+      }
+    }
+  }
+}
 
 export async function connectMetaMask(): Promise<WalletState> {
   if (typeof window === "undefined" || !window.ethereum) {
     throw new Error("MetaMask n'est pas installé. Installe l'extension MetaMask.");
   }
-
-  // Demander l'accès au compte
-  const accounts = await window.ethereum.request({
-    method: "eth_requestAccounts",
-  });
-
-  // Vérifier / basculer sur Ethereum Mainnet
-  const chainId = await window.ethereum.request({ method: "eth_chainId" });
-  if (chainId !== TARGET_CHAIN_ID) {
-    try {
-      await window.ethereum.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: TARGET_CHAIN_ID }],
-      });
-    } catch (switchErr: any) {
-      if (switchErr.code === 4902) {
-        await window.ethereum.request({
-          method: "wallet_addEthereumChain",
-          params: [
-            {
-              chainId: TARGET_CHAIN_ID,
-              chainName: "Ethereum Mainnet",
-              nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-              rpcUrls: ["https://eth.llamarpc.com"],
-              blockExplorerUrls: ["https://etherscan.io"],
-            },
-          ],
-        });
-      } else {
-        throw switchErr;
-      }
-    }
+  const provider = window.ethereum;
+  await ensureMainnet(provider);
+  const accounts = await requestAccounts(provider);
+  if (!accounts || accounts.length === 0) {
+    throw new Error("Aucun compte autorisé. Autorise l'accès à un compte dans ton wallet.");
   }
-
   const address = accounts[0];
+  activeProvider = provider as Eip1193Provider;
   return {
     address,
+    shortAddress: `${address.slice(0, 6)}...${address.slice(-4)}`,
     connected: true,
-    provider: window.ethereum,
+    chainId: 1,
     method: "metamask",
   };
 }
 
-// Vérifier si MetaMask est installé
-export function isMetaMaskInstalled(): boolean {
-  return typeof window !== "undefined" && !!window.ethereum;
-}
-
-// Écouter les changements de compte
-export function listenToAccountChanges(callback: (address: string | null) => void) {
-  if (typeof window !== "undefined" && window.ethereum) {
-    const handleAccountsChanged = (accounts: string[]) => {
-      callback(accounts.length > 0 ? accounts[0] : null);
-    };
-    window.ethereum.on("accountsChanged", handleAccountsChanged);
-    return () => {
-      window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
-    };
-  }
-  return () => {};
-}
-
-// Connexion WalletConnect (nécessite un projectId WalletConnect Cloud)
-// NOTE : pour activer, mets NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID dans .env.local
 export async function connectWalletConnect(): Promise<WalletState> {
   const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
   if (!projectId) {
@@ -88,10 +88,29 @@ export async function connectWalletConnect(): Promise<WalletState> {
   const { EthereumProvider } = await import("@walletconnect/ethereum-provider");
   const provider = await EthereumProvider.init({
     projectId,
-    chains: [1], // Ethereum Mainnet
+    chains: [1],
     showQrModal: true,
   });
   await provider.enable();
   const address = provider.accounts[0];
-  return { address, connected: true, provider, method: "walletconnect" };
+  activeProvider = provider as unknown as Eip1193Provider;
+  return {
+    address,
+    shortAddress: `${address.slice(0, 6)}...${address.slice(-4)}`,
+    connected: true,
+    chainId: 1,
+    method: "walletconnect",
+  };
+}
+
+export function listenToAccountChanges(callback: (address: string | null) => void): () => void {
+  if (typeof window !== "undefined" && window.ethereum?.on) {
+    const handler = (accounts: unknown) => {
+      const arr = accounts as string[];
+      callback(arr.length > 0 ? arr[0] : null);
+    };
+    window.ethereum.on("accountsChanged", handler);
+    return () => window.ethereum?.removeListener?.("accountsChanged", handler);
+  }
+  return () => {};
 }
