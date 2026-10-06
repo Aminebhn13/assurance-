@@ -114,6 +114,9 @@ export default function SubscribeWizard() {
       planName: plan.name,
       coverageRate: plan.coverageRate,
       premiumUsd: premium,
+      clientType: clientType === "entreprise" ? "Entreprise" : "Particulier",
+      score: solvency?.score,
+      coverageRatio: solvency?.coverageRatio,
     };
     downloadAttestation(data);
   };
