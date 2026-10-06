@@ -14,7 +14,7 @@ const STEPS = ["Votre prêt", "Connexion", "Preuve de contrôle", "Analyse", "Co
 
 export default function SubscribeWizard() {
   const [step, setStep] = useState(0);
-  const [loanAmount, setLoanAmount] = useState(100000);
+  const [loanAmount, setLoanAmount] = useState(5000000);
   const [duration, setDuration] = useState(12);
   const [fundName, setFundName] = useState("");
   const [clientType, setClientType] = useState<"particulier" | "entreprise">("particulier");
@@ -140,7 +140,7 @@ export default function SubscribeWizard() {
           <h2 className="text-xl font-bold text-gold-light">Votre prêt</h2>
           <div>
             <label className="block text-sm mb-1">Montant demandé (USD) : {loanAmount.toLocaleString("fr-FR")}</label>
-            <input type="range" min={10000} max={1000000} step={5000} value={loanAmount}
+            <input type="range" min={500000} max={50000000} step={500000} value={loanAmount}
               onChange={(e) => setLoanAmount(Number(e.target.value))} className="w-full accent-gold" />
           </div>
           <div>
