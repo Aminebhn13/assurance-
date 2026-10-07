@@ -9,9 +9,9 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        navy: { DEFAULT:"#0A1628", light:"#12233F", dark:"#060D1A", border:"#1E3A5F" },
-        gold: { DEFAULT:"#C9A227", light:"#E4C45C", dark:"#9C7C1E" },
-        brand: { DEFAULT:"#0E3A6E", light:"#1B5BA8" },
+        navy: { DEFAULT:"#0F1823", light:"#1C2733", dark:"#0A111A", border:"#2A3744" },
+        gold: { DEFAULT:"#8597B4", light:"#AEBCD2", dark:"#667892" },
+        brand: { DEFAULT:"#30465F", light:"#44617F" },
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
@@ -26,7 +26,7 @@ const config: Config = {
         fadeIn: { "0%":{opacity:"0"},"100%":{opacity:"1"} },
       },
       backgroundImage: {
-        "grid-pattern": "linear-gradient(rgba(201,162,39,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(201,162,39,0.04) 1px, transparent 1px)",
+        "grid-pattern": "linear-gradient(rgba(133,151,180,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(133,151,180,0.04) 1px, transparent 1px)",
       },
     },
   },

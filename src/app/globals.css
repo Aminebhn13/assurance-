@@ -2,26 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { --foreground:255,255,255; --bg:#0A1628; }
+:root { --foreground:233,238,245; --bg:#0F1823; }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body {
   color: rgb(var(--foreground));
-  background: #0A1628;
+  background: #0F1823;
   font-family: "Inter", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 ::-webkit-scrollbar { width:8px; height:8px; }
-::-webkit-scrollbar-track { background:#060D1A; }
-::-webkit-scrollbar-thumb { background:#1E3A5F; border-radius:4px; }
-::-webkit-scrollbar-thumb:hover { background:#C9A227; }
-::selection { background: rgba(201,162,39,0.4); color:#fff; }
+::-webkit-scrollbar-track { background:#0A111A; }
+::-webkit-scrollbar-thumb { background:#2A3744; border-radius:4px; }
+::-webkit-scrollbar-thumb:hover { background:#8597B4; }
+::selection { background: rgba(133,151,180,0.35); color:#fff; }
 
 .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(12px); border:1px solid rgba(255,255,255,0.06); }
-.gold-text { background: linear-gradient(135deg,#E4C45C 0%,#C9A227 100%); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+.gold-text { background: linear-gradient(135deg,#AEBCD2 0%,#8597B4 100%); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
 .card-hover { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
-.card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(201,162,39,0.12); border-color: rgba(201,162,39,0.4); }
-.btn-gold { background: linear-gradient(135deg,#E4C45C 0%,#C9A227 100%); color:#060D1A; transition: all .2s ease; }
-.btn-gold:hover { box-shadow: 0 8px 24px rgba(201,162,39,0.4); transform: translateY(-1px); }
-.btn-navy { background: #12233F; border:1px solid #1E3A5F; transition: all .2s ease; }
-.btn-navy:hover { border-color:#C9A227; }
+.card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.35); border-color: rgba(133,151,180,0.35); }
+.btn-gold { background: linear-gradient(135deg,#AEBCD2 0%,#8597B4 100%); color:#0A111A; transition: all .2s ease; }
+.btn-gold:hover { box-shadow: 0 8px 24px rgba(133,151,180,0.28); transform: translateY(-1px); }
+.btn-navy { background: #1C2733; border:1px solid #2A3744; transition: all .2s ease; }
+.btn-navy:hover { border-color:#8597B4; }
