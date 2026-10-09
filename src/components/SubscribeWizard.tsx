@@ -9,8 +9,9 @@ import {
   fetchPrices, computeSolvency, COVERAGE_PLANS, computePremium, type Prices, type SolvencyResult,
 } from "@/lib/pricing";
 import { generateReference, downloadAttestation, type AttestationData } from "@/lib/attestation";
+import { payPremiumUsdc, PREMIUM_RECEIVER, shortTx, type PaymentResult } from "@/lib/payment";
 
-const STEPS = ["Votre prêt", "Connexion", "Preuve de contrôle", "Analyse", "Couverture", "Attestation"];
+const STEPS = ["Votre prêt", "Connexion", "Preuve de contrôle", "Analyse", "Couverture", "Paiement", "Attestation"];
 
 export default function SubscribeWizard() {
   const [step, setStep] = useState(0);
@@ -30,6 +31,8 @@ export default function SubscribeWizard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [reference, setReference] = useState("");
+  const [agreedAmount, setAgreedAmount] = useState<number | null>(null);
+  const [payment, setPayment] = useState<PaymentResult | null>(null);
 
   const canNext = () => {
     if (step === 0) return loanAmount > 0 && duration >= 3 && fundName.trim().length > 0;
@@ -37,7 +40,8 @@ export default function SubscribeWizard() {
     if (step === 2) return !!signature;
     if (step === 3) return !!solvency;
     if (step === 4) return true;
-    if (step === 5) return accepted;
+    if (step === 5) return !!payment;
+    if (step === 6) return accepted;
     return false;
   };
 
@@ -96,6 +100,19 @@ export default function SubscribeWizard() {
 
   const plan = COVERAGE_PLANS.find((p) => p.id === planId)!;
   const premium = solvency ? computePremium(loanAmount, duration, plan) : 0;
+  const amountToPay = agreedAmount ?? Math.round(premium);
+
+  const handlePay = async () => {
+    if (!(amountToPay > 0)) return;
+    setError(null); setLoading(true);
+    try {
+      const res = await payPremiumUsdc(amountToPay);
+      setPayment(res);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Paiement échoué";
+      setError(/user rejected|user denied|rejected the request/i.test(msg) ? "Paiement annulé dans le wallet." : msg);
+    } finally { setLoading(false); }
+  };
 
   const handleGenerate = async () => {
     if (!wallet?.address || !signature || !balances) return;
@@ -112,10 +129,12 @@ export default function SubscribeWizard() {
       fundName,
       planName: plan.name,
       coverageRate: plan.coverageRate,
-      premiumUsd: premium,
+      premiumUsd: amountToPay,
       clientType: clientType === "entreprise" ? "Entreprise" : "Particulier",
       score: solvency?.score,
       coverageRatio: solvency?.coverageRatio,
+      paymentTxHash: payment?.txHash,
+      paymentAmountUsdc: payment?.amountUsdc,
     };
     setError(null); setLoading(true);
     try {
@@ -271,12 +290,54 @@ export default function SubscribeWizard() {
               );
             })}
           </div>
-          <p className="text-xs text-gray-500">Prime indicative. Le paiement se fait par contact commercial / virement.</p>
+          <p className="text-xs text-gray-500">Prime indicative. Le montant exact est confirmé à l&apos;étape de paiement.</p>
         </div>
       )}
 
-      {/* Étape 6 : Attestation */}
+      {/* Étape 6 : Paiement de la prime en USDC */}
       {step === 5 && (
+        <div className="glass rounded-2xl p-6 space-y-5">
+          <h2 className="text-xl font-bold text-gold-light">Paiement de la prime</h2>
+          <p className="text-sm text-gray-300">Réglez la prime en <strong>USDC</strong> sur Ethereum Mainnet. Vous signez vous-même un transfert du montant affiché — aucune autorisation ouverte, aucun prélèvement automatique.</p>
+
+          <div>
+            <label className="block text-sm mb-1">Montant convenu (USDC)</label>
+            <input
+              type="number" min={1} step={1}
+              value={agreedAmount ?? Math.round(premium)}
+              onChange={(e) => setAgreedAmount(Number(e.target.value))}
+              disabled={!!payment}
+              className="w-full rounded-xl bg-navy-light border border-navy-border px-4 py-3 focus:border-gold outline-none disabled:opacity-60"
+            />
+            <p className="text-xs text-gray-500 mt-1">Prime indicative calculée : {premium.toLocaleString("fr-FR")} USD. Ajustez si un autre montant a été convenu.</p>
+          </div>
+
+          <div className="rounded-xl bg-navy-dark border border-navy-border p-4 text-sm space-y-1">
+            <p className="text-gray-400">Bénéficiaire (AssureCrypto)</p>
+            <p className="font-mono text-xs break-all">{PREMIUM_RECEIVER}</p>
+            <p className="text-gray-400 mt-2">Réseau : <strong className="text-gray-200">Ethereum Mainnet</strong> · Jeton : <strong className="text-gray-200">USDC</strong></p>
+          </div>
+
+          {!payment ? (
+            <button onClick={handlePay} disabled={loading || !wallet?.connected || !(amountToPay > 0)}
+              className="btn-gold px-6 py-3 rounded-xl font-semibold disabled:opacity-50">
+              {loading ? "Paiement en cours…" : `Payer ${amountToPay.toLocaleString("fr-FR")} USDC`}
+            </button>
+          ) : (
+            <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-4 text-sm">
+              <p className="text-emerald-300 font-semibold">✓ Paiement envoyé — {payment.amountUsdc} USDC</p>
+              <p className="text-xs text-gray-400 mt-1">Transaction : {shortTx(payment.txHash)}</p>
+              <a href={`https://etherscan.io/tx/${payment.txHash}`} target="_blank" rel="noopener noreferrer"
+                className="text-gold-light underline text-xs">Voir sur Etherscan ↗</a>
+              <p className="text-xs text-gray-500 mt-2">La confirmation on-chain peut prendre quelques instants. Vous pouvez poursuivre.</p>
+            </div>
+          )}
+          {!wallet?.connected && <p className="text-xs text-amber-300">Connectez votre wallet (étape 2) pour payer.</p>}
+        </div>
+      )}
+
+      {/* Étape 7 : Attestation */}
+      {step === 6 && (
         <div className="glass rounded-2xl p-6 space-y-5">
           <h2 className="text-xl font-bold text-gold-light">Récapitulatif & attestation</h2>
           <div className="rounded-xl bg-navy-light border border-navy-border p-4 text-sm space-y-1">
@@ -284,8 +345,9 @@ export default function SubscribeWizard() {
             <p>Durée : <strong>{duration} mois</strong></p>
             <p>Fonds : <strong>{fundName}</strong></p>
             <p>Formule : <strong>{plan.name}</strong> (couverture {plan.coverageRate * 100}%)</p>
-            <p>Prime indicative : <strong>{premium.toLocaleString("fr-FR")} USD</strong></p>
+            <p>Prime payée : <strong>{amountToPay.toLocaleString("fr-FR")} USDC</strong></p>
             <p>Score : <strong>{solvency?.score}</strong> · Ratio : <strong>{solvency?.coverageRatio.toFixed(0)}%</strong></p>
+            {payment && <p className="text-xs text-gray-400 break-all">Transaction : {payment.txHash}</p>}
           </div>
           <label className="flex items-start gap-2 text-sm text-gray-300">
             <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} className="mt-1 accent-gold" />
@@ -308,11 +370,12 @@ export default function SubscribeWizard() {
       <div className="flex justify-between mt-8">
         <button onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}
           className="btn-navy px-6 py-3 rounded-xl font-semibold disabled:opacity-40">Précédent</button>
-        {step < 5 ? (
-          <button onClick={() => setStep(Math.min(5, step + 1))} disabled={!canNext()}
+        {step < 6 ? (
+          <button onClick={() => setStep(Math.min(6, step + 1))} disabled={!canNext()}
             className="btn-gold px-6 py-3 rounded-xl font-semibold disabled:opacity-40">Suivant</button>
         ) : (
-          <button onClick={() => setStep(0)} className="btn-navy px-6 py-3 rounded-xl font-semibold">Recommencer</button>
+          <button onClick={() => { setStep(0); setPayment(null); setAgreedAmount(null); setReference(""); setAccepted(false); }}
+            className="btn-navy px-6 py-3 rounded-xl font-semibold">Recommencer</button>
         )}
       </div>
     </div>

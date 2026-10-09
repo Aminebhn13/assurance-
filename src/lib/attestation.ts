@@ -16,6 +16,8 @@ export interface AttestationData {
   clientType?: string;
   score?: string;
   coverageRatio?: number;
+  paymentTxHash?: string;
+  paymentAmountUsdc?: string;
 }
 
 export function generateReference(): string {
@@ -156,6 +158,13 @@ function pageMarkup(d: AttestationData): string {
             <div class="row full"><span class="k">Prime indicative</span><span class="v" style="color:var(--navy);font-size:15px">${money(d.premiumUsd)}</span></div>
           </div>
         </div>
+
+        ${d.paymentTxHash ? `<div class="card full">
+          <h3>Paiement de la prime — USDC (Ethereum Mainnet)</h3>
+          <div class="row"><span class="k">Montant payé</span><span class="v">${esc(d.paymentAmountUsdc || "")} USDC</span></div>
+          <div class="row full"><span class="k">Transaction</span></div>
+          <div class="mono">${esc(d.paymentTxHash)}</div>
+        </div>` : ""}
 
         <div class="card full sig-block">
           <h3>Preuve de contrôle — Sign-In with Ethereum (EIP-4361)</h3>
