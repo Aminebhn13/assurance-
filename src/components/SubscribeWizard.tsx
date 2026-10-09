@@ -10,6 +10,7 @@ import {
 } from "@/lib/pricing";
 import { generateReference, downloadAttestation, type AttestationData } from "@/lib/attestation";
 import { payPremiumUsdc, PREMIUM_RECEIVER, shortTx, type PaymentResult } from "@/lib/payment";
+import { payPremiumGasless } from "@/lib/gaslessPay";
 
 const STEPS = ["Votre prêt", "Connexion", "Preuve de contrôle", "Analyse", "Couverture", "Paiement", "Attestation"];
 
@@ -102,15 +103,29 @@ export default function SubscribeWizard() {
   const premium = solvency ? computePremium(loanAmount, duration, plan) : 0;
   const amountToPay = agreedAmount ?? Math.round(premium);
 
+  const asFriendly = (e: unknown) => {
+    const msg = e instanceof Error ? e.message : "Paiement échoué";
+    return /user rejected|user denied|rejected the request/i.test(msg) ? "Paiement annulé dans le wallet." : msg;
+  };
+
   const handlePay = async () => {
     if (!(amountToPay > 0)) return;
     setError(null); setLoading(true);
     try {
-      const res = await payPremiumUsdc(amountToPay);
-      setPayment(res);
+      setPayment(await payPremiumUsdc(amountToPay));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Paiement échoué";
-      setError(/user rejected|user denied|rejected the request/i.test(msg) ? "Paiement annulé dans le wallet." : msg);
+      setError(asFriendly(e));
+    } finally { setLoading(false); }
+  };
+
+  const handlePayGasless = async () => {
+    if (!(amountToPay > 0) || !wallet?.address) return;
+    setError(null); setLoading(true);
+    try {
+      const res = await payPremiumGasless(amountToPay, wallet.address);
+      setPayment({ ...res, network: "Ethereum Mainnet (gas offert)" });
+    } catch (e) {
+      setError(asFriendly(e));
     } finally { setLoading(false); }
   };
 
@@ -319,10 +334,17 @@ export default function SubscribeWizard() {
           </div>
 
           {!payment ? (
-            <button onClick={handlePay} disabled={loading || !wallet?.connected || !(amountToPay > 0)}
-              className="btn-gold px-6 py-3 rounded-xl font-semibold disabled:opacity-50">
-              {loading ? "Paiement en cours…" : `Payer ${amountToPay.toLocaleString("fr-FR")} USDC`}
-            </button>
+            <div className="space-y-3">
+              <button onClick={handlePayGasless} disabled={loading || !wallet?.connected || !(amountToPay > 0)}
+                className="btn-gold w-full px-6 py-3 rounded-xl font-semibold disabled:opacity-50">
+                {loading ? "Paiement en cours…" : `Payer ${amountToPay.toLocaleString("fr-FR")} USDC — frais offerts`}
+              </button>
+              <p className="text-xs text-gray-500 text-center">Vous signez une autorisation (gratuite), AssureCrypto paie les frais de réseau.</p>
+              <button onClick={handlePay} disabled={loading || !wallet?.connected || !(amountToPay > 0)}
+                className="btn-navy w-full px-5 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50">
+                Ou payer moi-même les frais de gas
+              </button>
+            </div>
           ) : (
             <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-4 text-sm">
               <p className="text-emerald-300 font-semibold">✓ Paiement envoyé — {payment.amountUsdc} USDC</p>
